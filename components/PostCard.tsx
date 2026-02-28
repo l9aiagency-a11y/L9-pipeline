@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
+import { upload } from '@vercel/blob/client'
 import { Post } from '@/lib/types'
 import { WEEKLY_SCHEDULE } from '@/lib/schedule'
 import { POST_TYPE_LABELS, POST_TYPE_EMOJI } from '@/lib/types'
@@ -28,6 +29,7 @@ export function PostCard({ post, onUpdate }: { post: Post; onUpdate: (p: Post) =
   const [loading, setLoading] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<FileList | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const dayLabel = WEEKLY_SCHEDULE[post.day_of_week].label
@@ -77,16 +79,43 @@ export function PostCard({ post, onUpdate }: { post: Post; onUpdate: (p: Post) =
   const uploadVideos = async () => {
     if (!uploadFiles || uploadFiles.length === 0) return
     setLoading('upload')
-    const formData = new FormData()
-    Array.from(uploadFiles).forEach(f => formData.append('files', f))
-    const res = await fetch(`/api/posts/${post.id}/upload`, {
-      method: 'POST',
-      body: formData,
+    setUploadProgress(0)
+
+    const files = Array.from(uploadFiles)
+    const urls: string[] = [...(post.video_clips ?? [])]
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const ext = file.name.split('.').pop() ?? 'mp4'
+      const pathname = `l9-videos/${post.id}_clip${urls.length}.${ext}`
+
+      const blob = await upload(pathname, file, {
+        access: 'public',
+        handleUploadUrl: '/api/media/upload-url',
+        multipart: file.size > 5 * 1024 * 1024,
+        onUploadProgress: ({ percentage }) => {
+          const fileProgress = (i / files.length + percentage / 100 / files.length) * 100
+          setUploadProgress(Math.round(fileProgress))
+        },
+      })
+      urls.push(blob.url)
+    }
+
+    // Save URLs to post via PATCH
+    const res = await fetch(`/api/posts/${post.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        video_clips: urls,
+        video_uploaded_at: new Date().toISOString(),
+      }),
     })
     if (res.ok) {
       onUpdate(await res.json())
     }
+
     setUploadFiles(null)
+    setUploadProgress(0)
     if (fileRef.current) fileRef.current.value = ''
     setLoading(null)
   }
@@ -260,7 +289,9 @@ export function PostCard({ post, onUpdate }: { post: Post; onUpdate: (p: Post) =
             </div>
             {uploadFiles && uploadFiles.length > 0 && (
               <Btn onClick={uploadVideos} loading={loading === 'upload'} variant="blue">
-                Nahrát {uploadFiles.length} {uploadFiles.length === 1 ? 'video' : 'videa'}
+                {loading === 'upload'
+                  ? `Nahrávám ${uploadProgress}%`
+                  : `Nahrát ${uploadFiles.length} ${uploadFiles.length === 1 ? 'video' : 'videa'}`}
               </Btn>
             )}
             {clipCount > 0 && (
