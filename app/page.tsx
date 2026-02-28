@@ -5,11 +5,13 @@ import { getFullWeekSchedule, getTodaySchedule, formatCzechDate, getWeekNumber }
 import { PostCard } from '@/components/PostCard'
 import { ManualGenerate } from '@/components/ManualGenerate'
 import { StatusBadge } from '@/components/StatusBadge'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const LS_KEY = 'l9_posts'
 
 export default function Dashboard() {
   const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
   const today = getTodaySchedule()
   const weekNumber = getWeekNumber()
   const czechDate = formatCzechDate()
@@ -30,9 +32,11 @@ export default function Dashboard() {
         setPosts(Array.from(merged.values()).sort(
           (a, b) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime()
         ))
+        setLoading(false)
       })
       .catch(() => {
         setPosts(JSON.parse(localStorage.getItem(LS_KEY) ?? '[]'))
+        setLoading(false)
       })
   }, [])
 
@@ -67,97 +71,105 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505]">
-      <main className="mx-auto max-w-4xl px-6 py-10 space-y-10">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-4xl space-y-6">
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 px-4 pt-6 md:px-6 md:pt-8">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-white/25 mb-1">
-              Týden {weekNumber} · {czechDate}
-            </p>
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
               {POST_TYPE_EMOJI[today.type]}&nbsp; {today.label}
             </h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tyden {weekNumber} &middot; {czechDate}
+            </p>
           </div>
-          <div className="pt-1">
-            <ManualGenerate onGenerated={addPosts} />
-          </div>
+          <ManualGenerate onGenerated={addPosts} />
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Čeká na schválení', value: counts.pending,  dot: 'bg-amber-400' },
-            { label: 'Schváleno',          value: counts.approved, dot: 'bg-emerald-400' },
-            { label: 'Zveřejněno',         value: counts.posted,   dot: 'bg-purple-400' },
-          ].map(({ label, value, dot }) => (
-            <div key={label} className="rounded-2xl bg-[#0C0C0C] border border-white/[0.06] px-4 py-3.5 flex items-center gap-3">
-              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${dot}`} />
-              <div>
-                <div className="text-xl font-bold text-white tabular-nums">{value}</div>
-                <div className="text-[11px] text-white/30 mt-0.5">{label}</div>
+        <div className="grid grid-cols-3 gap-2 px-4 md:px-6">
+          {loading ? (
+            <>
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-16 rounded-xl" />
+            </>
+          ) : (
+            [
+              { label: 'Ceka na schvaleni', value: counts.pending, dot: 'bg-yellow-400' },
+              { label: 'Schvaleno', value: counts.approved, dot: 'bg-green-400' },
+              { label: 'Zverejneno', value: counts.posted, dot: 'bg-blue-400' },
+            ].map(({ label, value, dot }) => (
+              <div key={label} className="rounded-xl bg-card p-3 flex items-center gap-3">
+                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${dot}`} />
+                <div>
+                  <div className="text-2xl font-bold text-foreground tabular-nums">{value}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
-        {/* Week grid */}
-        <section>
-          <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/25">Tento týden</h2>
-          <div className="grid grid-cols-7 gap-2">
-            {weekSchedule.map(({ dayOfWeek, short, type }) => {
-              const post = dayOfWeek === today.dayOfWeek
-                ? todayPost
-                : posts.find(p => p.day_of_week === dayOfWeek && p.week_number === weekNumber)
-              const isToday = dayOfWeek === today.dayOfWeek
-              return (
-                <div
-                  key={dayOfWeek}
-                  className={`rounded-xl border p-3 text-center transition-all ${
-                    isToday
-                      ? 'border-[#0077FF]/50 bg-[#0077FF]/8'
-                      : 'border-white/[0.05] bg-[#0C0C0C]'
-                  }`}
-                >
-                  <div className={`text-[10px] font-semibold mb-2 ${isToday ? 'text-[#4DA6FF]' : 'text-white/25'}`}>
-                    {short}
-                  </div>
-                  <div className="text-base leading-none mb-2">{POST_TYPE_EMOJI[type]}</div>
-                  {post
-                    ? <StatusBadge status={post.status} />
-                    : <div className="h-5 rounded-full bg-white/[0.04] w-full" />
-                  }
-                </div>
-              )
-            })}
-          </div>
-        </section>
+        {/* Week calendar — horizontal scroll */}
+        <div className="flex overflow-x-auto gap-2 px-4 py-1 md:px-6 scrollbar-hide">
+          {weekSchedule.map(({ dayOfWeek, short, type }) => {
+            const post = dayOfWeek === today.dayOfWeek
+              ? todayPost
+              : posts.find(p => p.day_of_week === dayOfWeek && p.week_number === weekNumber)
+            const isToday = dayOfWeek === today.dayOfWeek
+            return (
+              <div
+                key={dayOfWeek}
+                className={`flex flex-col items-center gap-1.5 rounded-full px-3 py-2.5 min-w-[60px] shrink-0 transition-all ${
+                  isToday
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-muted-foreground'
+                }`}
+              >
+                <span className="text-[10px] font-semibold uppercase">{short}</span>
+                <span className="text-sm leading-none">{POST_TYPE_EMOJI[type]}</span>
+                {post ? (
+                  <StatusBadge status={post.status} />
+                ) : (
+                  <div className="h-4 w-8 rounded-full bg-muted" />
+                )}
+              </div>
+            )
+          })}
+        </div>
 
         {/* Today's variants */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
-              {todayPosts.length > 1 ? 'Dnešní varianty' : 'Dnešní post'}
+        <section className="px-4 md:px-6">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+              {todayPosts.length > 1 ? 'Dnesni varianty' : 'Dnesni post'}
             </h2>
             {todayPosts.length > 1 && (
-              <span className="rounded-full bg-[#0077FF]/20 px-2 py-0.5 text-[10px] font-semibold text-[#4DA6FF]">
+              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
                 {todayPosts.length}
               </span>
             )}
           </div>
-          {todayPosts.length > 0 ? (
-            <div className="space-y-4">
+
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-32 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+            </div>
+          ) : todayPosts.length > 0 ? (
+            <div className="space-y-3">
               {todayPosts.map(post => (
                 <PostCard key={post.id} post={post} onUpdate={updatePost} />
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-white/[0.07] bg-[#0A0A0A] p-10 text-center">
+            <div className="rounded-2xl border border-dashed border-border p-12 text-center">
               <div className="text-3xl mb-3 opacity-50">{POST_TYPE_EMOJI[today.type]}</div>
-              <div className="text-sm text-white/30 mb-1">Žádný post pro dnešek</div>
-              <div className="text-xs text-white/15">
-                Klikni <span className="text-[#4DA6FF]/60">+ 3 varianty</span> vpravo nahoře
+              <div className="text-sm text-muted-foreground mb-1">Zadny post pro dnesek</div>
+              <div className="text-xs text-muted-foreground/60">
+                Klikni <span className="text-primary">+ 3 varianty</span> vpravo nahore
               </div>
             </div>
           )}
@@ -165,16 +177,16 @@ export default function Dashboard() {
 
         {/* History */}
         {posts.filter(p => !todayIds.has(p.id)).length > 0 && (
-          <section>
-            <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/25">Historie</h2>
-            <div className="space-y-4">
+          <section className="px-4 pb-6 md:px-6 md:pb-8">
+            <h2 className="mb-3 text-xs font-medium tracking-widest text-muted-foreground uppercase">Historie</h2>
+            <div className="space-y-3">
               {posts.filter(p => !todayIds.has(p.id)).map(post => (
                 <PostCard key={post.id} post={post} onUpdate={updatePost} />
               ))}
             </div>
           </section>
         )}
-      </main>
+      </div>
     </div>
   )
 }

@@ -2,14 +2,21 @@
 import { useEffect, useState } from 'react'
 import { ViralIdea } from '@/lib/types'
 import { ViralIdeaCard } from '@/components/ViralIdeaCard'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Zap, Loader2, Lightbulb } from 'lucide-react'
 
 export default function ViralPage() {
   const [ideas, setIdeas] = useState<ViralIdea[]>([])
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [topicHint, setTopicHint] = useState('')
 
   useEffect(() => {
-    fetch('/api/viral').then(r => r.json()).then(setIdeas).catch(() => {})
+    fetch('/api/viral')
+      .then(r => r.json())
+      .then(setIdeas)
+      .catch(() => {})
+      .finally(() => setInitialLoading(false))
   }, [])
 
   const generate = async () => {
@@ -24,7 +31,7 @@ export default function ViralPage() {
       if (idea.id) setIdeas(prev => [idea, ...prev.filter(i => i.id !== idea.id)])
       else alert('Chyba: ' + JSON.stringify(idea))
     } catch {
-      alert('Nepodařilo se vygenerovat nápad')
+      alert('Nepodarilo se vygenerovat napad')
     } finally {
       setLoading(false)
     }
@@ -42,60 +49,88 @@ export default function ViralPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505]">
-      <main className="mx-auto max-w-3xl px-6 py-8 space-y-8">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-3xl space-y-6">
+
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-bold text-white mb-1">🔥 Virální Ideas</h1>
-          <p className="text-sm text-gray-500">Claude vygeneruje TikTok/Reel nápad s hookem, scénářem a ElevenLabs hlasem.</p>
+        <div className="px-4 pt-6 md:px-6 md:pt-8">
+          <h1 className="text-2xl font-semibold text-foreground">Viralni Ideas</h1>
+          <p className="text-sm text-muted-foreground mt-1">Claude vygeneruje TikTok/Reel napad s hookem, scenarem a ElevenLabs hlasem.</p>
         </div>
 
-        {/* Status bar */}
-        <div className="flex gap-6 text-sm">
-          <span><span className="text-amber-400">●</span> <span className="text-gray-400">{counts.new} Nové</span></span>
-          <span><span className="text-blue-400">●</span> <span className="text-gray-400">{counts.scripted} Scénář</span></span>
-          <span><span className="text-purple-400">●</span> <span className="text-gray-400">{counts.recorded} Natočeno</span></span>
-          <span><span className="text-emerald-400">●</span> <span className="text-gray-400">{counts.posted} Zveřejněno</span></span>
+        {/* Status pills */}
+        <div className="flex gap-2 px-4 md:px-6 overflow-x-auto scrollbar-hide">
+          {[
+            { label: `${counts.new} Nove`, dot: 'bg-yellow-400' },
+            { label: `${counts.scripted} Scenar`, dot: 'bg-blue-400' },
+            { label: `${counts.recorded} Natoceno`, dot: 'bg-purple-400' },
+            { label: `${counts.posted} Zverejneno`, dot: 'bg-green-400' },
+          ].map(({ label, dot }) => (
+            <span key={label} className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-card border border-border text-muted-foreground whitespace-nowrap">
+              <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+              {label}
+            </span>
+          ))}
         </div>
 
-        {/* Generate */}
-        <div className="rounded-xl border border-[#1a1a1a] bg-[#0E0E0E] p-4 space-y-3">
-          <div className="text-xs text-gray-500 uppercase tracking-widest">Vygenerovat nový nápad</div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={topicHint}
-              onChange={e => setTopicHint(e.target.value)}
-              placeholder="Volitelné téma (nechej prázdné pro AI výběr)…"
-              className="flex-1 bg-[#1a1a1a] text-white text-sm rounded-lg px-3 py-2 border border-[#2a2a2a] placeholder-gray-600 focus:outline-none focus:border-[#0077FF]"
-              onKeyDown={e => e.key === 'Enter' && generate()}
-            />
-            <button
-              onClick={generate}
-              disabled={loading}
-              className="bg-[#0077FF] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#0066DD] disabled:opacity-50 transition-colors shrink-0"
-            >
-              {loading ? '⏳ Generuju...' : '⚡ Vygenerovat'}
-            </button>
-          </div>
-          <p className="text-xs text-gray-600">
-            Ráno v 7:00 se automaticky vygeneruje denní nápad a odešle do Telegramu.
+        {/* Generate card */}
+        <div className="bg-card rounded-2xl p-4 mx-4 md:mx-6">
+          <div className="text-xs tracking-widest text-muted-foreground uppercase mb-3">Vygenerovat novy napad</div>
+          <input
+            type="text"
+            value={topicHint}
+            onChange={e => setTopicHint(e.target.value)}
+            placeholder="Volitelne tema (nechej prazdne pro AI vyber)..."
+            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors mb-3"
+            onKeyDown={e => e.key === 'Enter' && generate()}
+          />
+          <button
+            onClick={generate}
+            disabled={loading}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generuji...
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" />
+                Vygenerovat
+              </>
+            )}
+          </button>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Rano v 7:00 se automaticky vygeneruje denni napad.
           </p>
         </div>
 
         {/* Ideas list */}
-        {ideas.length === 0 && !loading && (
-          <div className="rounded-xl border border-[#1a1a1a] bg-[#0E0E0E] p-10 text-center text-gray-500">
-            Zatím žádné nápady. Klikni <span className="text-[#4DA6FF]">Vygenerovat</span> výše.
-          </div>
-        )}
+        <section className="px-4 pb-6 md:px-6 md:pb-8">
+          <h2 className="text-xs font-medium tracking-widest text-muted-foreground uppercase mb-3">Napady</h2>
 
-        <div className="space-y-4">
-          {ideas.map(idea => (
-            <ViralIdeaCard key={idea.id} idea={idea} onUpdate={updateIdea} />
-          ))}
-        </div>
-      </main>
+          {initialLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
+              <Skeleton className="h-24 rounded-2xl" />
+            </div>
+          ) : ideas.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+              <Lightbulb className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <div className="text-sm text-muted-foreground mb-1">Zatim zadne napady</div>
+              <div className="text-xs text-muted-foreground/60">Klikni Vygenerovat vyse</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {ideas.map(idea => (
+                <ViralIdeaCard key={idea.id} idea={idea} onUpdate={updateIdea} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { Navigation } from '@/components/Navigation'
+import { TopNav } from '@/components/TopNav'
+import { BottomNav } from '@/components/BottomNav'
+
+const inter = Inter({ subsets: ['latin', 'latin-ext'] })
 
 export const metadata: Metadata = {
   title: 'L9 AI Studios — Content Pipeline',
@@ -9,10 +13,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="cs">
-      <body className="min-h-screen bg-[#050505]">
-        <Navigation />
-        {children}
+    <html lang="cs" className="dark">
+      <body className={`${inter.className} min-h-screen bg-background text-foreground`}>
+        <TopNav />
+        <main className="pb-16 md:pb-0">
+          {children}
+        </main>
+        <BottomNav />
       </body>
     </html>
   )
