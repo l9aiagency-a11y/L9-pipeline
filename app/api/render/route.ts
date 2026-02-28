@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPost, updatePost } from '@/lib/store'
 import { generateVoiceover } from '@/lib/elevenlabs'
-import { generateSubtitles } from '@/lib/whisper'
 import { renderVideo } from '@/lib/creatomate'
-import { getTempPath, getTempDir } from '@/lib/paths'
+import { uploadFile } from '@/lib/storage'
+import { getTempPath } from '@/lib/paths'
 import fs from 'fs'
-import path from 'path'
 
 export const maxDuration = 180
 
@@ -17,42 +16,29 @@ export async function POST(req: NextRequest) {
     const post = getPost(post_id)
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
-    // 1. Generate voiceover if not already present
-    const audioPath = getTempPath('l9-audio', `${post_id}.mp3`)
-    if (!fs.existsSync(audioPath)) {
-      await generateVoiceover(post.voiceover_script, post_id)
-    }
-
-    // 2. Generate subtitles from audio
-    const subtitlesPath = getTempPath('l9-subtitles', `${post_id}.srt`)
-    if (!fs.existsSync(subtitlesPath)) {
-      await generateSubtitles(audioPath, post_id)
-    }
-
-    // 3. Collect video clips — prefer Blob URLs from post, fall back to local files
-    let videoFiles: string[] = [...(post.video_clips ?? [])]
-
-    if (videoFiles.length === 0) {
-      const videoDir = getTempDir('l9-videos', post_id)
-      if (fs.existsSync(videoDir)) {
-        videoFiles = fs.readdirSync(videoDir)
-          .filter(f => f.endsWith('.mp4') || f.endsWith('.mov'))
-          .map(f => path.join(videoDir, f))
-          .sort()
-      }
-    }
-
-    if (videoFiles.length === 0) {
+    // 1. Need at least one video clip uploaded
+    const videoClipUrl = post.video_clips?.[0]
+    if (!videoClipUrl) {
       return NextResponse.json(
         { error: 'No video clips found. Upload videos first.' },
         { status: 400 }
       )
     }
 
-    // 4. Kick off Creatomate render
-    const { renderId } = await renderVideo({ postId: post_id, videoFiles, audioPath, subtitlesPath })
+    // 2. Generate voiceover if not already present, then upload to Blob for public URL
+    const audioPath = getTempPath('l9-audio', `${post_id}.mp3`)
+    if (!fs.existsSync(audioPath)) {
+      await generateVoiceover(post.voiceover_script, post_id)
+    }
+    const audioUrl = await uploadFile(audioPath)
 
-    // 5. Update post with render_id + status
+    // 3. Kick off Creatomate render
+    const { renderId } = await renderVideo({
+      audio_url: audioUrl,
+      video_clip_url: videoClipUrl,
+    })
+
+    // 4. Update post with render_id + status
     updatePost(post_id, {
       render_id: renderId,
       status: 'rendering',

@@ -1,6 +1,3 @@
-import fs from 'fs'
-import { uploadFile } from './storage'
-
 const BASE = 'https://api.creatomate.com/v1'
 
 function apiKey(): string {
@@ -10,62 +7,67 @@ function apiKey(): string {
 }
 
 export async function renderVideo(params: {
-  postId: string
-  videoFiles: string[]
-  audioPath: string
-  subtitlesPath: string
+  audio_url: string
+  video_clip_url: string
 }): Promise<{ renderId: string }> {
-  const { videoFiles, audioPath, subtitlesPath } = params
-
-  const srtContent = fs.readFileSync(subtitlesPath, 'utf8')
+  const { audio_url, video_clip_url } = params
   const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/creatomate/webhook`
-
-  // Creatomate requires public HTTPS URLs — upload local files to Vercel Blob
-  const audioUrl = await uploadFile(audioPath)
-  const videoUrls = await Promise.all(
-    videoFiles.map(f => f.startsWith('http') ? Promise.resolve(f) : uploadFile(f))
-  )
-
-  // Build video elements — one per clip, all looped to match audio duration
-  const videoElements = videoUrls.map((url, i) => ({
-    type: 'video',
-    track: 1,
-    loop: true,
-    dynamic: true,
-    source: url,
-    ...(videoUrls.length > 1 ? { time: `${i} * (duration / ${videoUrls.length})` } : {}),
-  }))
 
   const source = {
     output_format: 'mp4',
     width: 1080,
     height: 1920,
     elements: [
-      ...videoElements,
+      {
+        type: 'video',
+        id: 'background_video',
+        source: video_clip_url,
+        width: '100%',
+        height: '100%',
+        x: '50%',
+        y: '50%',
+        x_anchor: '50%',
+        y_anchor: '50%',
+        fit: 'cover',
+        duration: 'auto',
+      },
+      {
+        type: 'shape',
+        shape: 'rectangle',
+        width: '100%',
+        height: '100%',
+        x: '50%',
+        y: '50%',
+        x_anchor: '50%',
+        y_anchor: '50%',
+        fill_color: '#000000',
+        fill_opacity: 0.35,
+      },
       {
         type: 'audio',
-        track: 2,
-        source: audioUrl,
+        id: 'voiceover',
+        source: audio_url,
+        duration: 'auto',
       },
       {
         type: 'text',
-        track: 3,
-        // Inline SRT as plain-text source — Creatomate auto-parses SRT for text elements
-        // when used with transcript timing
-        text: srtContent,
-        font_family: 'Montserrat',
-        font_weight: '700',
-        font_size: '8 vmin',
-        color: '#FFFFFF',
-        background_color: '#0077FF',
-        x_padding: '4 vmin',
-        y_padding: '2 vmin',
-        border_radius: '4 vmin',
-        x_alignment: '50%',
-        y: '75%',
-        width: '80%',
-        height: '15%',
+        transcript_source: 'voiceover',
+        transcript_effect: 'highlight',
+        transcript_maximum_length: 3,
+        width: '85%',
+        height: 'auto',
         x: '50%',
+        y: '62%',
+        x_anchor: '50%',
+        y_anchor: '50%',
+        font_family: 'Montserrat',
+        font_weight: '800',
+        font_size: '72px',
+        text_transform: 'uppercase',
+        fill_color: '#FFFFFF',
+        highlight_color: '#FFD700',
+        text_align: 'center',
+        line_height: '1.2',
       },
     ],
   }
