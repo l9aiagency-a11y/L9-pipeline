@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { getPostByRenderId, updatePost } from '@/lib/db'
+import { getPostByRenderId, updatePost } from '@/lib/store'
 
 function twilioAuth() {
   const sid = process.env.TWILIO_ACCOUNT_SID!
@@ -62,10 +62,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const postId = row.id as string
-    updatePost(postId, {
-      video_url: url ?? null,
-      cover_url: snapshot_url ?? null,
+    updatePost(row.id, {
+      video_url: url,
+      cover_url: snapshot_url,
       status: 'ready_for_review',
       render_completed_at: new Date().toISOString(),
     })
@@ -85,7 +84,7 @@ export async function POST(req: NextRequest) {
   if (status === 'failed') {
     const row = getPostByRenderId(renderId)
     if (row) {
-      updatePost(row.id as string, { status: 'failed' })
+      updatePost(row.id, { status: 'failed' })
     }
     console.error(`Creatomate render failed: renderId=${renderId}`)
   }

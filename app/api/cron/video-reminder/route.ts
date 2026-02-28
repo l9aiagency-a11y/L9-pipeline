@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTodayApproved } from '@/lib/db'
+import { getTodayApproved } from '@/lib/store'
 import { updatePost } from '@/lib/store'
 
 export const maxDuration = 30
@@ -18,12 +18,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const row = getTodayApproved()
-    if (!row || row.status !== 'approved') {
+    if (!row) {
       return NextResponse.json({ skipped: true })
     }
 
     const base = process.env.INTERNAL_BASE_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? ''
-    const postId = row.id as string
+    const postId = row.id
 
     const body =
       `🎬 *Čas natočit záběry!*\n\n` +

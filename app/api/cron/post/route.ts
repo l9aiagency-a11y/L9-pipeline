@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPostsDue } from '@/lib/db'
+import { getPostsDue } from '@/lib/store'
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET

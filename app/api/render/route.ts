@@ -3,6 +3,7 @@ import { getPost, updatePost } from '@/lib/store'
 import { generateVoiceover } from '@/lib/elevenlabs'
 import { generateSubtitles } from '@/lib/whisper'
 import { renderVideo } from '@/lib/creatomate'
+import { getTempPath, getTempDir } from '@/lib/paths'
 import fs from 'fs'
 import path from 'path'
 
@@ -17,30 +18,35 @@ export async function POST(req: NextRequest) {
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
     // 1. Generate voiceover if not already present
-    const audioDir = '/tmp/l9-audio'
-    const audioPath = path.join(audioDir, `${post_id}.mp3`)
+    const audioPath = getTempPath('l9-audio', `${post_id}.mp3`)
     if (!fs.existsSync(audioPath)) {
-      await generateVoiceover(post.voiceover_script as string, post_id)
+      await generateVoiceover(post.voiceover_script, post_id)
     }
 
     // 2. Generate subtitles from audio
-    const subtitlesDir = '/tmp/l9-subtitles'
-    const subtitlesPath = path.join(subtitlesDir, `${post_id}.srt`)
+    const subtitlesPath = getTempPath('l9-subtitles', `${post_id}.srt`)
     if (!fs.existsSync(subtitlesPath)) {
       await generateSubtitles(audioPath, post_id)
     }
 
-    // 3. Collect video clips from /tmp/l9-videos/{post_id}/
-    const videoDir = `/tmp/l9-videos/${post_id}`
-    let videoFiles: string[] = []
-    if (fs.existsSync(videoDir)) {
-      videoFiles = fs.readdirSync(videoDir)
-        .filter(f => f.endsWith('.mp4') || f.endsWith('.mov'))
-        .map(f => path.join(videoDir, f))
-        .sort()
-    }
+    // 3. Collect video clips — prefer Blob URLs from post, fall back to local files
+    let videoFiles: string[] = [...(post.video_clips ?? [])]
+
     if (videoFiles.length === 0) {
-      return NextResponse.json({ error: `No video files found in ${videoDir}` }, { status: 400 })
+      const videoDir = getTempDir('l9-videos', post_id)
+      if (fs.existsSync(videoDir)) {
+        videoFiles = fs.readdirSync(videoDir)
+          .filter(f => f.endsWith('.mp4') || f.endsWith('.mov'))
+          .map(f => path.join(videoDir, f))
+          .sort()
+      }
+    }
+
+    if (videoFiles.length === 0) {
+      return NextResponse.json(
+        { error: 'No video clips found. Upload videos first.' },
+        { status: 400 }
+      )
     }
 
     // 4. Kick off Creatomate render

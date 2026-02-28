@@ -22,3 +22,18 @@ export async function uploadFile(filePath: string, folder = 'l9'): Promise<strin
 
   return blob.url
 }
+
+/** Upload a Buffer directly to Vercel Blob (for FormData uploads without local file). */
+export async function uploadBuffer(
+  buffer: Buffer,
+  filename: string,
+  contentType: string,
+  folder = 'l9'
+): Promise<string> {
+  const blob = await put(`${folder}/${filename}`, buffer, {
+    access: 'public',
+    contentType,
+    allowOverwrite: true,
+  })
+  return blob.url
+}

@@ -1,6 +1,6 @@
 import fs from 'fs'
-import path from 'path'
 import { getSetting } from './settings'
+import { getTempPath } from './paths'
 
 const BASE = 'https://api.elevenlabs.io/v1'
 // Default: "Adam" – clear, natural male voice
@@ -75,10 +75,7 @@ export async function generateVoiceover(text: string, post_id: string): Promise<
     throw new Error(`ElevenLabs: ${res.status} ${err}`)
   }
 
-  const dir = '/tmp/l9-audio'
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-
-  const filePath = path.join(dir, `${post_id}.mp3`)
+  const filePath = getTempPath('l9-audio', `${post_id}.mp3`)
   fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()))
 
   return filePath

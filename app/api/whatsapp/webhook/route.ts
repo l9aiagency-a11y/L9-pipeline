@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTodayByStatus, updatePost } from '@/lib/db'
+import { getTodayByStatus, updatePost } from '@/lib/store'
 
 // TwiML empty response — Twilio requires this to acknowledge receipt
 function twiml(message?: string) {
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         return twiml()
       }
 
-      const postId = row.id as string
+      const postId = row.id
       updatePost(postId, { status: 'rendering', render_started_at: new Date().toISOString() })
 
       // Kick off render pipeline
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (buttonPayload === '⏭️ Dnes nepublikuji') {
       const row = getTodayByStatus('waiting_for_video') ?? getTodayByStatus('approved')
       if (row) {
-        updatePost(row.id as string, { status: 'failed' })
+        updatePost(row.id, { status: 'failed' })
       }
       await sendReply(from, '⏭️ Ok, dnešní post přeskočen.')
       return twiml()
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 17, 0, 0
       )).toISOString()
 
-      updatePost(row.id as string, { status: 'scheduled', scheduled_for: scheduledFor })
+      updatePost(row.id, { status: 'scheduled', scheduled_for: scheduledFor })
       await sendReply(from, '✅ Naplánováno! Post půjde live v 18:00 🚀')
       return twiml()
     }
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     if (buttonPayload === '❌ Zamítnout') {
       const row = getTodayByStatus('ready_for_review')
       if (row) {
-        updatePost(row.id as string, { status: 'failed' })
+        updatePost(row.id, { status: 'failed' })
       }
       await sendReply(from, '❌ Zamítnuto. Post nebude zveřejněn.'  )
       return twiml()

@@ -44,6 +44,7 @@ export interface Post {
   regeneration_count: number
   whatsapp_message_sid?: string
   render_id?: string
+  video_clips?: string[]
 }
 
 export const POST_TYPE_LABELS: Record<PostType, string> = {

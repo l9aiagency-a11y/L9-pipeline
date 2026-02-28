@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPost, updatePost } from '@/lib/db'
+import { getPost, updatePost } from '@/lib/store'
 import { publishReel } from '@/lib/instagram'
 
 function twilioAuth() {
@@ -31,27 +31,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'post_id required' }, { status: 400 })
     }
 
-    const row = getPost(post_id)
-    if (!row) {
+    const post = getPost(post_id)
+    if (!post) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    if (row.status !== 'ready_for_review' && row.status !== 'scheduled') {
+    if (post.status !== 'ready_for_review' && post.status !== 'scheduled') {
       return NextResponse.json(
-        { error: `Post status is '${row.status}', expected 'ready_for_review' or 'scheduled'` },
+        { error: `Post status is '${post.status}', expected 'ready_for_review' or 'scheduled'` },
         { status: 400 }
       )
     }
 
-    const hashtags = Array.isArray(row.hashtags)
-      ? (row.hashtags as string[]).join(' ')
-      : JSON.parse((row.hashtags as string) || '[]').join(' ')
-
-    const caption = [row.ig_caption as string, hashtags].filter(Boolean).join('\n\n')
+    const hashtags = post.hashtags.join(' ')
+    const caption = [post.ig_caption, hashtags].filter(Boolean).join('\n\n')
 
     const { instagramPostId } = await publishReel({
-      videoUrl:  row.video_url as string,
-      coverUrl:  row.cover_url as string,
+      videoUrl:  post.video_url!,
+      coverUrl:  post.cover_url!,
       caption,
       postId:    post_id,
     })

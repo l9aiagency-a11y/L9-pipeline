@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTodayApproved } from '@/lib/db'
+import { getTodayApproved } from '@/lib/store'
 
 export const maxDuration = 30
 
@@ -39,20 +39,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const row = getTodayApproved()
-    if (!row) {
+    const post = getTodayApproved()
+    if (!post) {
       return NextResponse.json({ skipped: true })
     }
 
-    const allHashtags = typeof row.hashtags === 'string'
-      ? (JSON.parse(row.hashtags as string) as string[])
-      : (row.hashtags as string[] ?? [])
-    const hashtags = allHashtags.slice(0, 10).join(' ')
+    const hashtags = post.hashtags.slice(0, 10).join(' ')
 
     // Message 1: caption + first 10 hashtags
     const msg1 =
       `✅ *Schválený post pro dnešek*\n\n` +
-      `📝 *Caption:*\n${row.ig_caption}\n\n` +
+      `📝 *Caption:*\n${post.ig_caption}\n\n` +
       `#️⃣ *Hashtagy:*\n${hashtags}`
 
     await sendMessage(msg1)
@@ -61,12 +58,12 @@ export async function GET(req: NextRequest) {
 
     // Message 2: full voiceover + full video brief
     const msg2 =
-      `🎙️ *Voiceover script:*\n${row.voiceover_script}\n\n` +
-      `🎬 *Video brief:*\n${row.video_brief}`
+      `🎙️ *Voiceover script:*\n${post.voiceover_script}\n\n` +
+      `🎬 *Video brief:*\n${post.video_brief}`
 
     await sendMessage(msg2)
 
-    return NextResponse.json({ success: true, post_id: row.id })
+    return NextResponse.json({ success: true, post_id: post.id })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: 'Reminder failed', detail: (e as Error).message }, { status: 500 })

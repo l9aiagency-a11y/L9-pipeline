@@ -1,7 +1,5 @@
 import Database from 'better-sqlite3'
-import path from 'path'
-
-const DB_PATH = '/tmp/l9-pipeline.db'
+import { DB_PATH } from './paths'
 
 let _db: Database.Database | null = null
 
@@ -39,8 +37,9 @@ function getDb(): Database.Database {
       render_id TEXT
     )
   `)
-  // Add render_id to existing DBs that predate this column
+  // Add columns to existing DBs that predate them
   try { _db.exec(`ALTER TABLE posts ADD COLUMN render_id TEXT`) } catch { /* already exists */ }
+  try { _db.exec(`ALTER TABLE posts ADD COLUMN video_clips TEXT`) } catch { /* already exists */ }
   return _db
 }
 
