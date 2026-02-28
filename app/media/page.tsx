@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { upload as blobUpload } from '@vercel/blob/client'
 import { MediaItem } from '@/lib/types'
 
 function formatSize(bytes: number) {
@@ -18,6 +19,7 @@ export default function MediaPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all')
+  const [uploadProgress, setUploadProgress] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -27,16 +29,41 @@ export default function MediaPage() {
   const upload = async (files: FileList | null) => {
     if (!files?.length) return
     setUploading(true)
+    setUploadProgress(0)
     const uploaded: MediaItem[] = []
     for (const file of Array.from(files)) {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/media', { method: 'POST', body: fd })
-      const item = await res.json()
-      if (item.id) uploaded.push(item)
+      try {
+        const blob = await blobUpload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/media/upload-url',
+          onUploadProgress: (progress) => {
+            setUploadProgress(progress.percentage)
+          },
+        })
+        const item: MediaItem = {
+          id: `media_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          filename: file.name.replace(/\s+/g, '_'),
+          original_name: file.name,
+          mime_type: file.type,
+          size: file.size,
+          uploaded_at: new Date().toISOString(),
+          url: blob.url,
+          tags: [],
+        }
+        // Save to backend store
+        await fetch('/api/media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item),
+        })
+        uploaded.push(item)
+      } catch (err) {
+        console.error('Upload failed:', file.name, err)
+      }
     }
     setItems(prev => [...uploaded, ...prev])
     setUploading(false)
+    setUploadProgress(0)
   }
 
   const remove = async (id: string) => {
@@ -78,7 +105,7 @@ export default function MediaPage() {
             disabled={uploading}
             className="bg-[#0077FF] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#0066DD] disabled:opacity-50 transition-colors"
           >
-            {uploading ? '⏳ Nahrávám…' : '⬆ Nahrát soubory'}
+            {uploading ? `⏳ Nahrávám… ${uploadProgress}%` : '⬆ Nahrát soubory'}
           </button>
           <input ref={inputRef} type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => upload(e.target.files)} />
         </div>

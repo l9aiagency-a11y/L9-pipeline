@@ -6,27 +6,13 @@ export async function GET() {
   return NextResponse.json(getAllMedia())
 }
 
+// Accepts JSON with a MediaItem (blob URL already uploaded client-side)
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
-
-    const bytes = await file.arrayBuffer()
-    const base64 = Buffer.from(bytes).toString('base64')
-    const dataUrl = `data:${file.type};base64,${base64}`
-
-    const item: MediaItem = {
-      id: `media_${Date.now()}`,
-      filename: `${Date.now()}_${file.name.replace(/\s+/g, '_')}`,
-      original_name: file.name,
-      mime_type: file.type,
-      size: file.size,
-      uploaded_at: new Date().toISOString(),
-      url: dataUrl,
-      tags: [],
+    const item = (await req.json()) as MediaItem
+    if (!item.id || !item.url) {
+      return NextResponse.json({ error: 'Missing id or url' }, { status: 400 })
     }
-
     saveMediaItem(item)
     return NextResponse.json(item)
   } catch (e) {
