@@ -17,6 +17,7 @@ export async function renderVideo(params: {
     output_format: 'mp4',
     width: 1080,
     height: 1920,
+    duration: 'auto',
     elements: [
       {
         type: 'video',
@@ -29,7 +30,6 @@ export async function renderVideo(params: {
         x_anchor: '50%',
         y_anchor: '50%',
         fit: 'cover',
-        duration: 'auto',
         loop: true,
       },
       {
