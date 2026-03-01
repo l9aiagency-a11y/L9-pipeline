@@ -6,6 +6,7 @@ import { PostCard } from '@/components/PostCard'
 import { ManualGenerate } from '@/components/ManualGenerate'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PipelineStatus } from '@/components/PipelineStatus'
 
 const LS_KEY = 'l9_posts'
 
@@ -49,7 +50,11 @@ export default function Dashboard() {
 
   const addPosts = (newPosts: Post[]) => {
     setPosts(prev => {
-      const map = new Map(prev.map(p => [p.id, p]))
+      // Remove old today's posts, keep everything else
+      const withoutToday = prev.filter(
+        p => !(p.day_of_week === today.dayOfWeek && p.week_number === weekNumber)
+      )
+      const map = new Map(withoutToday.map(p => [p.id, p]))
       newPosts.forEach(p => map.set(p.id, p))
       return Array.from(map.values()).sort(
         (a, b) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime()
@@ -110,6 +115,11 @@ export default function Dashboard() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Pipeline Status */}
+        <div className="px-4 md:px-6">
+          <PipelineStatus />
         </div>
 
         {/* Week calendar — horizontal scroll */}
