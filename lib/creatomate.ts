@@ -30,6 +30,7 @@ export async function renderVideo(params: {
         y_anchor: '50%',
         fit: 'cover',
         duration: 'auto',
+        loop: true,
       },
       {
         type: 'shape',
