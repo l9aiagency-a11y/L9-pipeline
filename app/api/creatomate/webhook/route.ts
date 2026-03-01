@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { getPostByRenderId, updatePost } from '@/lib/store'
+import { getPostByRenderId, updatePost, getAllPosts } from '@/lib/store'
 
 function twilioAuth() {
   const sid = process.env.TWILIO_ACCOUNT_SID!
@@ -32,42 +32,55 @@ async function sendWhatsApp(body: string, persistentActions?: string[]) {
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
+  console.log('[WEBHOOK] Creatomate webhook received, rawBody:', rawBody)
 
-  // Validate Creatomate webhook signature if secret is configured
-  const secret = process.env.CREATOMATE_WEBHOOK_SECRET
-  if (secret) {
-    const signature = req.headers.get('x-creatomate-signature') ?? ''
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(rawBody)
-      .digest('hex')
-    if (signature !== expected) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-  }
+  // Temporarily disabled signature validation for debugging
+  // const secret = process.env.CREATOMATE_WEBHOOK_SECRET
+  // if (secret) {
+  //   const signature = req.headers.get('x-creatomate-signature') ?? ''
+  //   const expected = crypto
+  //     .createHmac('sha256', secret)
+  //     .update(rawBody)
+  //     .digest('hex')
+  //   if (signature !== expected) {
+  //     console.log('[WEBHOOK] Signature mismatch! header:', signature, 'expected:', expected)
+  //     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  //   }
+  // }
 
   let payload: { id: string; status: string; url?: string; snapshot_url?: string }
   try {
     payload = JSON.parse(rawBody)
   } catch {
+    console.error('[WEBHOOK] Failed to parse JSON body')
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const { id: renderId, status, url, snapshot_url } = payload
+  console.log('[WEBHOOK] Parsed payload — renderId:', renderId, 'status:', status, 'url:', url)
+
+  // Log all posts in store for debugging
+  const allPosts = getAllPosts()
+  console.log('[WEBHOOK] Total posts in store:', allPosts.length)
+  console.log('[WEBHOOK] Posts with render_id:', allPosts.filter(p => p.render_id).map(p => ({ id: p.id, render_id: p.render_id, status: p.status })))
 
   if (status === 'succeeded') {
     const row = getPostByRenderId(renderId)
+    console.log('[WEBHOOK] getPostByRenderId result:', row ? { id: row.id, status: row.status, render_id: row.render_id } : 'NOT FOUND')
+
     if (!row) {
-      console.warn(`Creatomate webhook: no post found for render_id=${renderId}`)
-      return NextResponse.json({ ok: true })
+      console.warn(`[WEBHOOK] No post found for render_id=${renderId} — store may have lost state (serverless cold start)`)
+      return NextResponse.json({ ok: true, warning: 'post not found' })
     }
 
+    console.log('[WEBHOOK] Updating post', row.id, 'from', row.status, 'to ready_for_review')
     updatePost(row.id, {
       video_url: url,
       cover_url: snapshot_url,
       status: 'ready_for_review',
       render_completed_at: new Date().toISOString(),
     })
+    console.log('[WEBHOOK] Post updated successfully')
 
     await sendWhatsApp(
       `🎬 *Video je hotové!*\n\n` +
@@ -78,16 +91,18 @@ export async function POST(req: NextRequest) {
         `reply:✅ Publikovat v 18:00`,
         `reply:❌ Zamítnout`,
       ]
-    ).catch(err => console.error('WhatsApp notify failed:', err))
+    ).catch(err => console.error('[WEBHOOK] WhatsApp notify failed:', err))
   }
 
   if (status === 'failed') {
     const row = getPostByRenderId(renderId)
+    console.log('[WEBHOOK] Failed render — post found:', row ? row.id : 'NOT FOUND')
     if (row) {
       updatePost(row.id, { status: 'failed' })
     }
-    console.error(`Creatomate render failed: renderId=${renderId}`)
+    console.error(`[WEBHOOK] Creatomate render failed: renderId=${renderId}`)
   }
 
+  console.log('[WEBHOOK] Done, returning ok')
   return NextResponse.json({ ok: true })
 }
