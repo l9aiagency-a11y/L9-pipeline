@@ -11,7 +11,7 @@ export async function renderVideo(params: {
   video_clip_url: string
 }): Promise<{ renderId: string }> {
   const { audio_url, video_clip_url } = params
-  const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/creatomate/webhook`
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://l9-pipeline.vercel.app'}/api/creatomate/webhook`
 
   const source = {
     output_format: 'mp4',
